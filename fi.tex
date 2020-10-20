@@ -1,0 +1,252 @@
+\documentclass[hyperref={unicode}, xcolor=dvipsnames, t]{beamer}
+
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{csquotes}
+\usepackage{biblatex}
+\usepackage{graphicx}
+\usepackage{animate}
+
+% in documenet
+\addbibresource{literature.bib}
+\usepackage{booktabs}
+\usetheme[
+  workplace=fi,
+]{MU}
+\usepackage{calculator}
+\newcommand\speed[1]{{%
+  \SUBTRACT{#1}{0.65}{\subtracted}%
+  \DIVIDE{\subtracted}{0.5}{\divided}%
+  \MULTIPLY{\divided}{100}{\multiplied}%
+  \MIN{\multiplied}{100}{\clipped}%
+  \textcolor{Green!\clipped!Red}{$#1\times$}}%
+}
+\usepackage[acronym]{glossaries}
+\makeglossaries
+\loadglsentries{acronyms}
+
+\title[Single Image Super-Resolution]{Single Image Super-Resolution}
+
+\author[Mikuláš Bankovič]{Mikuláš Bankovič}
+\institute[FI MU]{Faculty of Informatics, Masaryk University}
+\date{\today}
+\subject{Single Image Super-Resolution: SRCNN and ESPCN}
+\keywords{computer vision, machine learning, super-resolution}
+
+
+\begin{document}
+
+\begin{frame}[plain]
+\maketitle
+\end{frame}
+
+\section[Introduction]{Introduction}
+
+\begin{frame}{Introduction}{Motivation}
+    Why \gls{sr}? \href{https://youtu.be/I_8ZH1Ggjk0?t=32}{\structure{Link}} 
+    
+    \begin{itemize}
+      \item<2-8> Games
+      \item<3-8> \alert{Medical imaging}
+      \item<4-8> Photography details
+      \item<5-8> Astronomy
+      \item<6-8> \alert{Face and character recognition}
+      \item<7-8> \alert{Project \structure{video699}\cite{video699}}
+      \item<8-8> Super-scaling of \alert{FFFI} movies
+    \end{itemize}
+    
+    \begin{center}
+        \only<2>{
+            \vspace{-2cm}
+            \includegraphics[height=0.5\textheight]{figures/games.png}
+        }
+        \only<3>{
+            \vspace{-1.5cm}
+            \includegraphics[height=0.4\textheight]{figures/medical.png}
+        }
+        \only<4>{
+        \vspace{-1cm}
+            \includegraphics[height=0.4\textheight]{figures/building.png}
+        }
+        \only<5>{
+        \vspace{-0.3cm}
+            \includegraphics[height=0.4\textheight]{figures/astronomy.jpeg}
+        }
+    \end{center}
+\end{frame}
+
+
+\begin{frame}{History of \gls{sr}}
+Bilinear and \alert{bicubic} interpolation:
+\begin{itemize}
+    \item no \alert{prior knowledge} about images
+    \item no way to \alert{fine-tune to specific dataset}
+    \item does not improve with \alert{more data}
+\end{itemize}
+
+Sparse-coding-based methods:
+\begin{itemize}
+    \item The methods are part of example-based learning methods.
+    \item They consist of a \alert{multiple-step pipeline}:
+    \begin{enumerate}
+        \item Crop overlapping patches and preprocess them (substract mean and normalize)
+        \item Encode these patches by \gls{lr} dictionary
+        \item Encoded coefficients are passed to the \gls{hr} dictionary
+        \item Overlapping \gls{hr} patches are aggregated
+    \end{enumerate}
+    \item Focus on optimizing and improving dictionaries with mapping, while \alert{disregarding other steps}.
+    \item They often have to solve \alert{optimization problems on inference}.
+    
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Metrics}
+    \begin{itemize}
+        \item The \gls{psnr} (in dB) is defined as following:
+        $$ PSNR =  10\times\log_{10} \left(\frac{MAX^2_I}{MSE}\right), $$
+        where $MAX_I$ is the maximum possible pixel value of the image. When the pixels are represented using 8 bits per sample, this is 255. 
+        \item \gls{ssim} - weighted combination of luminance, contrast and structure
+    \end{itemize}
+\end{frame}
+
+\section{SRCNN}
+\begin{frame}{SRCNN}
+    \begin{itemize}
+        \item Given by \textcite{srcnn}, the \gls{cnn} is \alert{equivalent} to the previous pipeline.
+        \item That brings multiple advantages:
+        \begin{itemize}
+            \item The inference consists only from \alert{feed-forward pass}.
+            \item The pipeline is unified, therefore, each step is optimized during training.
+            \item The dictionaries are not explicitly formed, but included in the weights.
+            \item Provides \alert{superior quality and speed performance} (Next slides).
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{SRCNN}
+    \begin{itemize}
+        \item<1> \gls{srcnn} is a simple \gls{cnn} with \alert{three} convolutional layers. (with \# of filters 9-5-5)
+        \item<1> The input image is firstly upscaled using bicubic interpolation.
+        \item<1> The next step is feed-forward pass through the network.
+        \item<1> \gls{srcnn} has 8032 parameters and it is nowadays a small network.
+    \end{itemize}
+    \begin{center}
+        \only<2>{
+            \vspace{-2cm}
+            \includegraphics[height=0.55\textheight]{figures/srcnn.png}
+        }
+        \only<3>{
+            \vspace{-2cm}
+            \includegraphics[height=0.7\textheight]{figures/performance.png}
+        }
+        \only<4>{
+        \vspace{-3cm}
+            \includegraphics[height=0.9\textheight]{figures/example.png}
+        }
+    \end{center}
+\end{frame}
+
+\begin{frame}{Problems}
+    \begin{itemize}
+        \item The \alert{bicubic interpolation} is an expensive operation that often introduce side-effects as blurring or noise amplification.
+        \item More data could \alert{overfit} the network, because its smaller size.
+        \item Most of the operations are performed in an expensive \alert{\gls{hr}} space.
+    \end{itemize}
+\end{frame}
+
+\section{FSRCNN}
+\begin{frame}{FSRCNN}
+    The main differences between \gls{srcnn} and \gls{fsrcnn}:
+    \begin{itemize}
+        \item There is no pre-processing or upsampling at the beginning. The feature extraction took place in the \alert{\gls{lr} space}.
+        \item A $1\times1$ convolution is used after the initial $5\times5$ convolution to reduce the number of channels, and hence lesser computation and memory, similar to how the Inception\cite{inception} network is developed.
+        \item Multiple $3\times3$ convolutions are used, instead of having a big convolutional filter, similar to how the VGG network works by simplifying the architecture to reduce the number of parameters.
+        \item Upsampling is done by using a learnt transposed convolution, thus improving the model.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{FSRCNN}
+     \begin{itemize}
+        \item 17.36 times faster than \gls{srcnn} and can run in real time (24 fps) with a generic CPU.
+        \item All layers except from the last can be shared with multiple upscaling factors.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{FSRCNN}
+    \begin{center}
+        \only<1>{
+            \begin{itemize}
+                \item Transposed convolution \href{https://i.stack.imgur.com/YyCu2.gif}{\structure{LINK}}\cite{conv_operations}
+                \item Transposed convolution with stride \href{https://i.stack.imgur.com/f2RiP.gif}{\structure{LINK}}\cite{conv_operations}
+            \end{itemize}
+        }
+        \only<2>{
+            \includegraphics[width=0.9\linewidth, height=0.9\textheight,keepaspectratio]{figures/fsrcnn.png}
+        }
+        \only<3>{
+            \includegraphics[width=0.9\linewidth, height=0.9\textheight,keepaspectratio]{figures/fsrcnn1.png}
+        }
+        \only<4>{
+            \includegraphics[width=0.9\linewidth, height=0.9\textheight,keepaspectratio]{figures/fsrcnn-example.png}
+        }
+    \end{center}
+\end{frame}
+
+\section{ESPCN}
+\begin{frame}{ESPCN}
+    \begin{itemize}
+        \item \gls{espcn} introduces the concept of sub-pixel convolution to replace the transposed convolution layer for upsampling. This solves two problems associated with it:
+        \begin{enumerate}
+            \item Transposed convolution happens in the high resolution space, and thus is more computationally expensive.
+            \item It resolves the checkerboard issue in deconvolution, which occurs due to the overlap operation of convolution.
+        \end{enumerate}
+    \end{itemize}
+    \begin{center}
+        \includegraphics[keepaspectratio, height=0.4\textheight]{figures/trans_conv_problem.png}
+    \end{center}
+\end{frame}
+
+\begin{frame}{Sub-pixel convolutional layers}
+    \begin{itemize}
+        \item Sub-pixel convolution works by converting depth to space, as seen in the figure below. 
+        \item Pixels from multiple channels in a low resolution image are rearranged to a single channel in a high resolution image. 
+    \end{itemize}
+    \begin{center}
+    \only<1> {
+        \includegraphics[width=\linewidth]{figures/sub-pixel.png}
+    }
+    \only<2> {
+        \includegraphics[width=0.8\linewidth]{figures/sub-pixel-detail.jpeg}
+    }
+    \end{center}
+\end{frame}
+
+\section{SRGAN}
+\begin{frame}{SRGAN}
+    \begin{itemize}
+        \item Problem: All previous methods were train on MSE loss function. However, ideal MSE image is not offhand the most photo-realistic
+        \item Solution: \gls{gan}
+        \newline
+        \item Problem: As in other computer vision disciplines, deeper models are more successful, however, harder to train due to some aspects, such as vanishing and exploding gradient.
+        \item Solution: ResNet uses skip connections
+        \begin{center}
+            \includegraphics[keepaspectratio,]{}
+        \end{center}
+        
+    \end{itemize}
+\end{frame}
+\section{\bibname}
+\begin{frame}[t, allowframebreaks]{\bibname}
+\printbibliography[heading=none]
+\end{frame}
+
+\begin{frame}[plain]
+\vfill
+\centerline{Thank You for Your Attention!}
+\vfill\vfill
+\end{frame}
+
+\printglossary[type=\acronymtype]
+
+\end{document}
